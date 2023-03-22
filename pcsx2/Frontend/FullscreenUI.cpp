@@ -6959,22 +6959,12 @@ void FullscreenUI::DrawAchievementsLoginWindow()
 
 #else
 
-bool FullscreenUI::OpenAchievementsWindow()
+void FullscreenUI::OpenAchievementsWindow()
 {
-	return false;
 }
 
-bool FullscreenUI::OpenLeaderboardsWindow()
+void FullscreenUI::OpenLeaderboardsWindow()
 {
-	return false;
-}
-
-void FullscreenUI::DrawAchievementsSettingsPage()
-{
-	BeginMenuButtons();
-	ActiveButton(ICON_FA_BAN "  This build was not compiled with RetroAchievements support.", false, false,
-		ImGuiFullscreen::LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY);
-	EndMenuButtons();
 }
 
 void FullscreenUI::DrawAchievementsLoginWindow()

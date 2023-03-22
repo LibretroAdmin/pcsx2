@@ -204,7 +204,7 @@ bool GSDeviceOGL::Create()
 		// Always read from the first buffer
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
 		glReadBuffer(GL_COLOR_ATTACHMENT0);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 	}
 
 	// ****************************************************************
@@ -559,7 +559,10 @@ void GSDeviceOGL::RestoreAPIState()
 {
 	glBindVertexArray(m_vertex_array_object);
 
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
+	if(GLState::fbo)
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
+	else
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 
 	glViewportIndexedf(0, 0, 0, static_cast<float>(GLState::viewport.x), static_cast<float>(GLState::viewport.y));
 	glScissorIndexed(0, GLState::scissor.x, GLState::scissor.y, GLState::scissor.width(), GLState::scissor.height());
@@ -1115,8 +1118,15 @@ void GSDeviceOGL::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r
 	}
 	else
 	{
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_write);
+		if(m_fbo_read)
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
+		else
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
+		if(m_fbo_write)
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_write);
+		else
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
+
 		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sid, 0);
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, did, 0);
 
@@ -1125,8 +1135,12 @@ void GSDeviceOGL::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r
 		glBlitFramebuffer(r.x, r.y, r.x + w, r.y + h, destX + r.x, destY + r.y, destX + r.x + w, destY + r.y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		glEnable(GL_SCISSOR_TEST);
 
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		if(GLState::fbo)
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
+		else
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 	}
 }
 
@@ -1704,7 +1718,10 @@ void GSDeviceOGL::OMSetFBO(GLuint fbo)
 	if (GLState::fbo != fbo)
 	{
 		GLState::fbo = fbo;
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+		if(fbo)
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+		else
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 	}
 }
 

@@ -24,6 +24,11 @@
 #include <dxgi1_3.h>
 #include <d3d11_1.h>
 
+#ifdef __LIBRETRO__
+#include "libretro_d3d.h"
+extern retro_environment_t environ_cb;
+#endif
+
 struct GSVertexShader11
 {
 	wil::com_ptr_nothrow<ID3D11VertexShader> vs;
@@ -137,7 +142,9 @@ private:
 	wil::com_ptr_nothrow<ID3D11Device> m_dev;
 	wil::com_ptr_nothrow<ID3D11DeviceContext> m_ctx;
 	wil::com_ptr_nothrow<ID3DUserDefinedAnnotation> m_annotation;
+#ifndef __LIBRETRO__
 	wil::com_ptr_nothrow<IDXGISwapChain1> m_swapchain;
+#endif
 	wil::com_ptr_nothrow<ID3D11Buffer> m_vb;
 	wil::com_ptr_nothrow<ID3D11Buffer> m_ib;
 	u32 m_vb_pos = 0; // bytes

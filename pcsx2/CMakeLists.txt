@@ -36,6 +36,10 @@ else()
 	)
 endif()
 
+if(CCACHE_FOUND)
+	set(CommonFlags ${CommonFlags} -Werror=date-time)
+endif()
+
 if(GCC_VERSION VERSION_EQUAL "8.0" OR GCC_VERSION VERSION_GREATER "8.0")
 	# gs is pretty bad at this
 	target_compile_options(PCSX2_FLAGS INTERFACE -Wno-packed-not-aligned -Wno-class-memaccess)
@@ -1063,6 +1067,44 @@ set(pcsx2x86Headers
 	x86/R5900_Profiler.h
 	)
 
+if(LIBRETRO)
+	set(pcsx2DEV9Sources)
+	set(pcsx2DEV9Headers)
+	set(pcsx2USBSources)
+	set(pcsx2USBHeaders)
+	set(pcsx2RecordingSources)
+	set(pcsx2RecordingVirtualPadResources)
+	set(pcsx2RecordingHeaders)
+	set(pcsx2ZipToolsSources)
+	set(pcsx2ZipToolsHeaders)
+
+	LIST(REMOVE_ITEM pcsx2PADSources
+		PAD/Host/KeyStatus.cpp
+	)
+
+	LIST(REMOVE_ITEM pcsx2FrontendSources
+		Frontend/FullscreenUI.cpp
+		Frontend/ImGuiManager.cpp
+		Frontend/ImGuiOverlays.cpp
+		Frontend/CommonHotkeys.cpp
+		Frontend/InputManager.cpp
+	)
+	LIST(REMOVE_ITEM pcsx2SPU2Sources
+	#	SPU2/Debug.cpp
+	#	SPU2/Wavedump_wav.cpp
+
+		SPU2/SndOut.cpp
+		SPU2/SndOut_SDL.cpp
+		SPU2/SndOut_Portaudio.cpp
+		SPU2/Config.cpp
+		SPU2/ConfigSoundTouch.cpp
+		SPU2/Timestretcher.cpp
+		SPU2/wx/wxConfig.cpp
+		SPU2/Linux/Alsa.cpp
+		SPU2/Linux/Dialogs.cpp
+	)
+endif()
+
 # These ones benefit a lot from LTO
 set(pcsx2LTOSources
 	${pcsx2Sources}
@@ -1165,9 +1207,14 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 )
 
 target_link_libraries(PCSX2_FLAGS INTERFACE
-	demangler
 	simpleini
 )
+
+if(NOT LIBRETRO)
+	target_link_libraries(PCSX2_FLAGS INTERFACE
+		demangler
+	)
+endif()
 
 if(WIN32)
 	target_link_libraries(PCSX2_FLAGS INTERFACE
@@ -1201,6 +1248,15 @@ else()
 	)
 endif()
 
+#if(LIBRETRO AND MSVC)
+##   include_directories(x86/ix86-32 IPU System)
+##   add_definitions(-D_ARCH_32=1 -D_M_X86_32) #32-bit
+#	add_definitions(-D_M_X86 -D__i386__ -DTIXML_USE_STL -D_SCL_SECURE_NO_WARNINGS)
+#	add_definitions(-D_ARCH_64=1 -D_M_X86_64 -D__M_X86_64) #64-bit
+#	target_link_libraries(PCSX2 PRIVATE baseclasses)
+#	target_link_libraries(PCSX2 PRIVATE comctl32 ws2_32 shlwapi winmm rpcrt4)
+#endif()
+
 # additonal include directories
 target_include_directories(PCSX2_FLAGS INTERFACE
 	.
@@ -1212,7 +1268,7 @@ target_include_directories(PCSX2_FLAGS INTERFACE
 	"${FFMPEG_INCLUDE_DIRS}"
 )
 
-if(COMMAND target_precompile_headers)
+if(COMMAND target_precompile_headers AND NOT CCACHE_FOUND)
 	message("Using precompiled headers.")
 	target_precompile_headers(PCSX2_FLAGS INTERFACE PrecompiledHeader.h)
 endif()

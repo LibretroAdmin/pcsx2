@@ -1637,7 +1637,7 @@ void VMManager::Internal::VSyncOnCPUThread()
 	}
 
 	Host::CPUThreadVSync();
-
+#ifndef __LIBRETRO__
 	if (EmuConfig.EnableRecordingTools)
 	{
 		// This code is called _before_ Counter's vsync end, and _after_ vsync start
@@ -1654,6 +1654,7 @@ void VMManager::Internal::VSyncOnCPUThread()
 		// so we can either read from it, or overwrite it!
 		g_InputRecording.handleControllerDataUpdate();
 	}
+#endif
 }
 
 void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)

@@ -44,7 +44,9 @@ else()
 	find_package(ZLIB REQUIRED)
 
 	## Use pcsx2 package to find module
+#	if (NOT MSVC)
 	include(FindLibc)
+#	endif()
 
 	## Use CheckLib package to find module
 	include(CheckLib)
@@ -90,6 +92,15 @@ else()
 		find_package(Libbacktrace)
 	endif()
 endif(WIN32)
+
+#if(MSVC)
+#	add_definitions(-DPTW32_STATIC_LIB)
+##   add_definitions(-D__CLEANUP_SEH)
+#	add_subdirectory(${CMAKE_SOURCE_DIR}/3rdparty/pthreads4w)
+#	include_directories(${CMAKE_SOURCE_DIR}/3rdparty/pthreads4w/include)
+#	add_subdirectory(${CMAKE_SOURCE_DIR}/3rdparty/baseclasses)
+##   include_directories(${CMAKE_SOURCE_DIR}/3rdparty/baseclasses)
+#endif()
 
 # Require threads on all OSes.
 find_package(Threads REQUIRED)

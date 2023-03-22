@@ -169,7 +169,7 @@ static VirtualMemoryManagerPtr makeMemoryManager(const char* name, const char* f
 			// VTLB will throw a fit if we try to put EE main memory here
 			continue;
 		}
-		auto mgr = std::make_shared<VirtualMemoryManager>(name, file_mapping_name, base, size, /*upper_bounds=*/0, /*strict=*/true);
+		auto mgr = std::make_shared<VirtualMemoryManager>(name, file_mapping_name, base, size, /*upper_bounds=*/0, /*strict=*/false);
 		if (mgr->IsOk())
 		{
 			return mgr;

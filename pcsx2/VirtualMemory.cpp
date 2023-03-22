@@ -334,6 +334,9 @@ void RecompiledCodeReserve::Assign(VirtualMemoryManagerPtr allocator, size_t off
 
 void RecompiledCodeReserve::Reset()
 {
+#if defined(_WIN32) && defined(__LIBRETRO__) // TODO: investigate
+#define IsDevBuild true
+#endif
 	if (IsDevBuild && m_baseptr)
 	{
 		// Clear the recompiled code block to 0xcc (INT3) -- this helps disasm tools show

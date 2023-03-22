@@ -544,10 +544,15 @@ void GSRenderer::VSync(u32 field, bool registers_written)
 	if (current && !blank_frame)
 	{
 		src_rect = CalculateDrawSrcRect(current);
+#ifdef __LIBRETRO__
+		src_uv = GSVector4(0, 0, 1, 1);
+		draw_rect = GSVector4(0, 0, current->GetWidth(), current->GetHeight());
+#else
 		src_uv = GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy();
 		draw_rect = CalculateDrawDstRect(g_host_display->GetWindowWidth(), g_host_display->GetWindowHeight(),
 			src_rect, current->GetSize(), g_host_display->GetDisplayAlignment(), g_host_display->UsesLowerLeftOrigin(),
 			GetVideoMode() == GSVideoMode::SDTV_480P || (GSConfig.PCRTCOverscan && GSConfig.PCRTCOffsets));
+#endif
 		s_last_draw_rect = draw_rect;
 
 		if (GSConfig.CASMode != GSCASMode::Disabled)

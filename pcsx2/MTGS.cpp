@@ -82,18 +82,30 @@ SysMtgsThread::~SysMtgsThread()
 
 void SysMtgsThread::StartThread()
 {
+#ifdef __LIBRETRO__
+	if (m_thread != std::thread::id({}))
+#else
 	if (m_thread.joinable())
+#endif
 		return;
 
 	pxAssertRel(!m_open_flag.load(), "GS thread should not be opened when starting");
 	m_sem_event.Reset();
 	m_shutdown_flag.store(false, std::memory_order_release);
+#ifdef __LIBRETRO__
+	GSinit();
+#else
 	m_thread = std::thread(&SysMtgsThread::ThreadEntryPoint, this);
+#endif
 }
 
 void SysMtgsThread::ShutdownThread()
 {
+#ifdef __LIBRETRO__
+	if (m_thread == std::thread::id({}))
+#else
 	if (!m_thread.joinable())
+#endif
 		return;
 
 	// just go straight to shutdown, don't wait-for-open again
@@ -103,7 +115,11 @@ void SysMtgsThread::ShutdownThread()
 
 	// make sure the thread actually exits
 	m_sem_event.NotifyOfWork();
+#ifdef __LIBRETRO__
+	m_thread = {};
+#else
 	m_thread.join();
+#endif
 }
 
 void SysMtgsThread::ThreadEntryPoint()
@@ -147,10 +163,10 @@ void SysMtgsThread::ThreadEntryPoint()
 			// wait until we're asked to try again...
 			continue;
 		}
-
+#ifndef __LIBRETRO__
 		// we're ready to go
 		MainLoop();
-
+#endif
 		// when we come back here, it's because we closed (or shutdown)
 		// that means the emu thread should be blocked, waiting for us to be done
 		pxAssertRel(!m_open_flag.load(std::memory_order_relaxed), "Open flag is clear on close");
@@ -271,16 +287,32 @@ union PacketTagType
 
 bool SysMtgsThread::TryOpenGS()
 {
+#ifdef __LIBRETRO__
+	if(IsOpen())
+		return true;
+
+	m_thread = std::this_thread::get_id();
+#endif
+
 	std::memcpy(RingBuffer.Regs, PS2MEM_GS, sizeof(PS2MEM_GS));
 
 	if (!GSopen(EmuConfig.GS, EmuConfig.GS.Renderer, RingBuffer.Regs))
 		return false;
 
 	GSsetGameCRC(ElfCRC);
+#ifdef __LIBRETRO__
+	m_open_flag.store(true, std::memory_order_release);
+	// notify emu thread that we finished opening (or failed)
+	m_open_or_close_done.Post();
+#endif
 	return true;
 }
 
+#ifdef __LIBRETRO__
+void SysMtgsThread::MainLoop(bool flush_all)
+#else
 void SysMtgsThread::MainLoop()
+#endif
 {
 	// Threading info: run in MTGS thread
 	// m_ReadPos is only update by the MTGS thread so it is safe to load it with a relaxed atomic
@@ -469,7 +501,10 @@ void SysMtgsThread::MainLoop()
 							((GSRegSIGBLID&)RingBuffer.Regs[0x1080]) = (GSRegSIGBLID&)remainder[2];
 
 							// CSR & 0x2000; is the pageflip id.
-							GSvsync((((u32&)RingBuffer.Regs[0x1000]) & 0x2000) ? 0 : 1, remainder[4] != 0);
+#ifdef __LIBRETRO__
+							if(!flush_all)
+#endif
+								GSvsync((((u32&)RingBuffer.Regs[0x1000]) & 0x2000) ? 0 : 1, remainder[4] != 0);
 
 							m_QueuedFrameCount.fetch_sub(1);
 							if (m_VsyncSignalListener.exchange(false))
@@ -550,9 +585,24 @@ void SysMtgsThread::MainLoop()
 					// Make sure to post the signal after the m_ReadPos has been updated...
 					m_SignalRingEnable.store(false, std::memory_order_release);
 					m_sem_OnRingReset.Post();
+#ifndef __LIBRETRO__
 					continue;
+#endif
 				}
 			}
+#ifdef __LIBRETRO__
+			if(!flush_all && tag.command == GS_RINGTYPE_VSYNC) {
+				mtvu_lock.unlock();
+				return;
+			}
+			if(flush_all &&
+				!gifUnit.gifPath[GIF_PATH_1].getReadAmount() &&
+				!gifUnit.gifPath[GIF_PATH_2].getReadAmount() &&
+				!gifUnit.gifPath[GIF_PATH_3].getReadAmount()){
+				mtvu_lock.unlock();
+				return;
+			}
+#endif
 		}
 
 		// TODO: With the new race-free WorkSema do we still need these?
@@ -578,10 +628,52 @@ void SysMtgsThread::MainLoop()
 	m_ReadPos.store(m_WritePos.load(std::memory_order_acquire), std::memory_order_relaxed);
 	m_sem_event.Kill();
 }
+#ifdef __LIBRETRO__
+void SysMtgsThread::StepFrame()
+{
+	pxAssert(std::this_thread::get_id() == m_thread);
+	MainLoop(false);
+}
 
+void SysMtgsThread::Flush()
+{
+	if (m_VsyncSignalListener.exchange(false))
+		m_sem_Vsync.Post();
+
+	pxAssert(std::this_thread::get_id() == m_thread);
+	if(!gifUnit.gifPath[GIF_PATH_1].getReadAmount() &&
+		!gifUnit.gifPath[GIF_PATH_2].getReadAmount() &&
+		!gifUnit.gifPath[GIF_PATH_3].getReadAmount())
+		return;
+
+	SetEvent();
+	MainLoop(true);
+}
+
+void SysMtgsThread::SignalVsync()
+{
+	if (m_VsyncSignalListener.exchange(false))
+		m_sem_Vsync.Post();
+}
+
+#endif
 void SysMtgsThread::CloseGS()
 {
+#ifdef __LIBRETRO__
+	if( m_SignalRingEnable.exchange(false) )
+	{
+		//Console.Warning( "(MTGS Thread) Dangling RingSignal on empty buffer!  signalpos=0x%06x", m_SignalRingPosition.exchange(0) ) );
+		m_SignalRingPosition.store(0, std::memory_order_release);
+		m_sem_OnRingReset.Post();
+	}
+	if (m_VsyncSignalListener.exchange(false))
+		m_sem_Vsync.Post();
+#endif
 	GSclose();
+#ifdef __LIBRETRO__
+	m_open_flag.store(false, std::memory_order_release);
+	m_open_or_close_done.Post();
+#endif
 }
 
 // Waits for the GS to empty out the entire ring buffer contents.
@@ -590,7 +682,15 @@ void SysMtgsThread::CloseGS()
 // If isMTVU, then this implies this function is being called from the MTVU thread...
 void SysMtgsThread::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 {
+#ifdef __LIBRETRO__
+	if(std::this_thread::get_id() == m_thread)
+	{
+		GetMTGS().Flush();
+		return;
+	}
+#else
 	pxAssertDev(std::this_thread::get_id() != m_thread.get_id(), "This method is only allowed from threads *not* named MTGS.");
+#endif
 	if (!pxAssertDev(IsOpen(), "MTGS Warning!  WaitGS issued on a closed thread."))
 		return;
 
@@ -862,9 +962,10 @@ bool SysMtgsThread::WaitForOpen()
 		return true;
 
 	StartThread();
-
+#ifndef __LIBRETRO__
 	// request open, and kick the thread.
 	m_open_flag.store(true, std::memory_order_release);
+#endif
 	m_sem_event.NotifyOfWork();
 
 	// wait for it to finish its stuff
@@ -882,21 +983,25 @@ void SysMtgsThread::WaitForClose()
 {
 	if (!IsOpen())
 		return;
-
+#ifndef __LIBRETRO__
 	// ask the thread to stop processing work, by clearing the open flag
 	m_open_flag.store(false, std::memory_order_release);
-
+#endif
 	// and kick the thread if it's sleeping
 	m_sem_event.NotifyOfWork();
 
 	// and wait for it to finish up..
 	m_open_or_close_done.Wait();
+
+	m_thread = {};
 }
 
 void SysMtgsThread::Freeze(FreezeAction mode, MTGS_FreezeData& data)
 {
 	pxAssertRel(IsOpen(), "GS thread is open");
+#ifndef __LIBRETRO__
 	pxAssertDev(std::this_thread::get_id() != m_thread.get_id(), "This method is only allowed from threads *not* named MTGS.");
+#endif
 	SendPointerPacket(GS_RINGTYPE_FREEZE, (int)mode, &data);
 	WaitGS();
 }

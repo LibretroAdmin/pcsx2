@@ -14,7 +14,7 @@
  */
 
 #include "PrecompiledHeader.h"
-
+#include "GS/GS.h"
 #include "OpenGLHostDisplay.h"
 #include "common/Assertions.h"
 #include "common/Console.h"
@@ -137,7 +137,7 @@ void OpenGLHostDisplay::SetVSync(VsyncMode mode)
 	// Window framebuffer has to be bound to call SetSwapInterval.
 	GLint current_fbo = 0;
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &current_fbo);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 
 	if (mode != VsyncMode::Adaptive || !m_gl_context->SetSwapInterval(-1))
 		m_gl_context->SetSwapInterval(static_cast<s32>(mode != VsyncMode::Off));
@@ -341,7 +341,7 @@ HostDisplay::PresentResult OpenGLHostDisplay::BeginPresent(bool frame_skip)
 		return PresentResult::FrameSkipped;
 
 	glDisable(GL_SCISSOR_TEST);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_DEFAULT_FRAMEBUFFER);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -354,9 +354,10 @@ void OpenGLHostDisplay::EndPresent()
 {
 	glDisable(GL_SCISSOR_TEST);
 	glDisable(GL_STENCIL_TEST);
-
+#ifndef __LIBRETRO__
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+#endif
 	GL::Program::ResetLastProgram();
 
 	if (m_gpu_timing_enabled)

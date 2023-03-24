@@ -24,11 +24,6 @@
 #include <dxgi1_3.h>
 #include <d3d11_1.h>
 
-#ifdef __LIBRETRO__
-#include "libretro_d3d.h"
-extern retro_environment_t environ_cb;
-#endif
-
 struct GSVertexShader11
 {
 	wil::com_ptr_nothrow<ID3D11VertexShader> vs;

@@ -83,7 +83,7 @@ SysMtgsThread::~SysMtgsThread()
 void SysMtgsThread::StartThread()
 {
 #ifdef __LIBRETRO__
-	if (m_thread != std::thread::id({}))
+	if (m_thread != std::thread::id())
 #else
 	if (m_thread.joinable())
 #endif
@@ -102,7 +102,7 @@ void SysMtgsThread::StartThread()
 void SysMtgsThread::ShutdownThread()
 {
 #ifdef __LIBRETRO__
-	if (m_thread == std::thread::id({}))
+	if (m_thread == std::thread::id())
 #else
 	if (!m_thread.joinable())
 #endif

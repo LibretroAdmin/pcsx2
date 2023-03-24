@@ -64,17 +64,6 @@ static HRESULT s_hr = E_FAIL;
 
 #endif
 
-#ifdef __LIBRETRO__
-//#include "Window/GSWndRetro.h"
-#include "options.h"
-namespace Options {
-GfxOption<int> upscale_multiplier("pcsx2_upscale_multiplier", "Internal Resolution",
-								  {{"Native PS2", 1}, {"2x Native ~720p", 2}, {"3x Native ~1080p", 3},{"4x Native ~1440p 2K", 4},
-								   {"5x Native ~1620p 3K", 5}, {"6x Native ~2160p 4K", 6}, {"8x Native ~2880p 5K", 8}});
-static GfxOption<int> sw_renderer_threads("pcsx2_sw_renderer_threads", "Software Renderer Threads", 2, 10);
-}
-#endif
-
 #include <fstream>
 
 // do NOT undefine this/put it above includes, as x11 people love to redefine

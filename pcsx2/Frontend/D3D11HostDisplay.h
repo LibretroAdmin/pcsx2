@@ -95,8 +95,10 @@ protected:
 	ComPtr<ID3D11DeviceContext> m_context;
 
 	ComPtr<IDXGIFactory> m_dxgi_factory;
+#ifndef __LIBRETRO__
 	ComPtr<IDXGISwapChain> m_swap_chain;
 	ComPtr<ID3D11RenderTargetView> m_swap_chain_rtv;
+#endif
 
 	bool m_allow_tearing_supported = false;
 	bool m_using_flip_model_swap_chain = true;

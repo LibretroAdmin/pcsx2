@@ -81,22 +81,6 @@ bool GSDevice11::Create()
 	D3D11_RASTERIZER_DESC rd;
 	D3D11_BLEND_DESC bsd;
 
-#ifdef __LIBRETRO__
-	retro_hw_render_interface_d3d11 *d3d11 = nullptr;
-	if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void **)&d3d11) || !d3d11) {
-		printf("Failed to get HW rendering interface!\n");
-		return false;
-	}
-
-	if (d3d11->interface_version != RETRO_HW_RENDER_INTERFACE_D3D11_VERSION) {
-		printf("HW render interface mismatch, expected %u, got %u!\n", RETRO_HW_RENDER_INTERFACE_D3D11_VERSION, d3d11->interface_version);
-		return false;
-	}
-
-	m_dev = d3d11->device;
-	m_ctx = d3d11->context;
-	D3D_FEATURE_LEVEL level = d3d11->featureLevel;
-#else
 	D3D_FEATURE_LEVEL level;
 
 	if (g_host_display->GetRenderAPI() != RenderAPI::D3D11)
@@ -124,8 +108,6 @@ bool GSDevice11::Create()
 		m_shader_cache.Open({}, m_dev->GetFeatureLevel(), SHADER_CACHE_VERSION, GSConfig.UseDebugDevice);
 		Console.WriteLn("Not using shader cache.");
 	}
-
-#endif
 
 	// Set maximum texture size limit based on supported feature level.
 	if (support_feature_level_11_0)
@@ -399,80 +381,9 @@ void GSDevice11::SetFeatures()
 
 void GSDevice11::ResetAPIState()
 {
-#ifdef __LIBRETRO__ // needs to be moved somewhere else
-	D3D11_TEXTURE2D_DESC desc{};
-	desc.Width = w;
-	desc.Height = h;
-	desc.MipLevels = 1;
-	desc.ArraySize = 1;
-	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	desc.SampleDesc.Count = 1;
-	desc.SampleDesc.Quality = 0;
-	desc.Usage = D3D11_USAGE_DEFAULT;
-	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-	desc.CPUAccessFlags = 0;
-	desc.MiscFlags = 0;
-
-	D3D11_SUBRESOURCE_DATA srsc = {};
-	srsc.pSysMem  = malloc(w*h*4);
-	srsc.SysMemPitch = w * 4;
-	srsc.SysMemSlicePitch = w * h * 4;
-	memset((void*)srsc.pSysMem, 0xFF, w*h*3);
-
-
-	CComPtr<ID3D11Texture2D> texture;
-	if (FAILED(m_dev->CreateTexture2D(&desc, nullptr, &texture)))
-		return false;
-	free((void*)srsc.pSysMem);
-
-	m_backbuffer = new GSTexture11(texture);
-#endif
 	// Clear out the GS, since the imgui draw doesn't get rid of it.
 	m_ctx->GSSetShader(nullptr, nullptr, 0);
 }
-
-#ifdef __LIBRETRO__
-void GSDevice11::Flip()  // needs to be in void D3D11HostDisplay::EndPresent()
-{
-//	if(!m_current)
-//		return;
-
-	ID3D11RenderTargetView *nullView = nullptr;
-	m_ctx->OMSetRenderTargets(1, &nullView, nullptr);
-
-	ID3D11ShaderResourceView* srv = *(GSTexture11*)m_backbuffer;
-	m_ctx->PSSetShaderResources(0, 1, &srv);
-
-	extern retro_video_refresh_t video_cb;
-	video_cb(RETRO_HW_FRAME_BUFFER_VALID, m_backbuffer->GetWidth(), m_backbuffer->GetHeight(), 0);
-
-	/* restore State */
-	uint32 stride = m_state.vb_stride;
-	uint32 offset = 0;
-	m_ctx->IASetVertexBuffers(0, 1, &m_state.vb, &stride, &offset);
-	m_ctx->IASetIndexBuffer(m_state.ib, DXGI_FORMAT_R32_UINT, 0);
-	m_ctx->IASetInputLayout(m_state.layout);
-	m_ctx->IASetPrimitiveTopology(m_state.topology);
-	m_ctx->VSSetShader(m_state.vs, NULL, 0);
-	m_ctx->VSSetConstantBuffers(0, 1, &m_state.vs_cb);
-	m_ctx->GSSetShader(m_state.gs, NULL, 0);
-	m_ctx->GSSetConstantBuffers(0, 1, &m_state.gs_cb);
-	m_ctx->PSSetShader(m_state.ps, NULL, 0);
-	m_ctx->PSSetConstantBuffers(0, 1, &m_state.ps_cb);
-	m_ctx->PSSetShaderResources(0, m_state.ps_sr_views.size(), m_state.ps_sr_views.data());
-	m_ctx->PSSetSamplers(0, countof(m_state.ps_ss), m_state.ps_ss);
-	m_ctx->OMSetDepthStencilState(m_state.dss, m_state.sref);
-	float BlendFactor[] = {m_state.bf, m_state.bf, m_state.bf, 0};
-	m_ctx->OMSetBlendState(m_state.bs, BlendFactor, 0xffffffff);
-#if 0
-	m_ctx->OMSetRenderTargets(1, &m_state.rt_view, m_state.dsv);
-	D3D11_VIEWPORT vp = {m_hack_topleft_offset, m_hack_topleft_offset,
-						 (float)m_state.viewport.x, (float)m_state.viewport.y, 0.0f, 1.0f};
-	m_ctx->RSSetViewports(1, &vp);
-	m_ctx->RSSetScissorRects(1, m_state.scissor);
-#endif
-}
-#endif
 
 void GSDevice11::RestoreAPIState()
 {
@@ -784,6 +695,19 @@ void GSDevice11::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture*
 
 void GSDevice11::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, bool linear)
 {
+#ifdef __LIBRETRO__
+//	if(!sTex)
+//		return;
+
+	ID3D11RenderTargetView *nullView = nullptr;
+	m_ctx->OMSetRenderTargets(1, &nullView, nullptr);
+
+	ID3D11ShaderResourceView* srv = *(GSTexture11*)sTex;
+	m_ctx->PSSetShaderResources(0, 1, &srv);
+
+	extern retro_video_refresh_t video_cb;
+	video_cb(RETRO_HW_FRAME_BUFFER_VALID, sTex->GetWidth(), sTex->GetHeight(), 0);
+#else
 	ASSERT(sTex);
 
 	GSVector2i ds;
@@ -853,6 +777,7 @@ void GSDevice11::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture*
 	//
 
 	PSSetShaderResources(nullptr, nullptr);
+#endif
 }
 
 void GSDevice11::UpdateCLUTTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize)

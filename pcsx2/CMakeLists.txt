@@ -1248,15 +1248,6 @@ else()
 	)
 endif()
 
-#if(LIBRETRO AND MSVC)
-##   include_directories(x86/ix86-32 IPU System)
-##   add_definitions(-D_ARCH_32=1 -D_M_X86_32) #32-bit
-#	add_definitions(-D_M_X86 -D__i386__ -DTIXML_USE_STL -D_SCL_SECURE_NO_WARNINGS)
-#	add_definitions(-D_ARCH_64=1 -D_M_X86_64 -D__M_X86_64) #64-bit
-#	target_link_libraries(PCSX2 PRIVATE baseclasses)
-#	target_link_libraries(PCSX2 PRIVATE comctl32 ws2_32 shlwapi winmm rpcrt4)
-#endif()
-
 # additonal include directories
 target_include_directories(PCSX2_FLAGS INTERFACE
 	.

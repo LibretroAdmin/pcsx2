@@ -76,6 +76,10 @@ GfxOption<std::string> renderer("pcsx2_renderer", "Renderer", {"Auto", "OpenGL",
 #endif
 															   "Software", "Null"});
 
+GfxOption<int> upscale_multiplier("pcsx2_upscale_multiplier", "Internal Resolution",
+								  {{"Native PS2", 1}, {"2x Native ~720p", 2}, {"3x Native ~1080p", 3},{"4x Native ~1440p 2K", 4},
+								   {"5x Native ~1620p 3K", 5}, {"6x Native ~2160p 4K", 6}, {"8x Native ~2880p 5K", 8}});
+//static GfxOption<int> sw_renderer_threads("pcsx2_sw_renderer_threads", "Software Renderer Threads", 2, 10);
 } // namespace Options
 
 retro_environment_t environ_cb;
@@ -401,7 +405,9 @@ static void context_reset()
 	g_host_display->MakeCurrent();
 	g_host_display->SetupDevice();
 
-//	GSConfig.UpscaleMultiplier = Options::upscale_multiplier;
+	s_settings_interface.SetFloatValue("EmuCore/GS", "upscale_multiplier", Options::upscale_multiplier);
+//	VMManager::ApplySettings();
+	GSConfig.UpscaleMultiplier = Options::upscale_multiplier;
 	EmuConfig.GS.UpscaleMultiplier = Options::upscale_multiplier;
 	GetMTGS().TryOpenGS();
 	VMManager::SetPaused(false);
@@ -635,6 +641,8 @@ void retro_run(void)
 	{
 		retro_system_av_info av_info;
 		retro_get_system_av_info(&av_info);
+//		s_settings_interface.SetFloatValue("EmuCore/GS", "upscale_multiplier", Options::upscale_multiplier);
+//		VMManager::ApplySettings();
 #if 1
 		environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 #else
@@ -746,7 +754,7 @@ bool retro_serialize(void* data, size_t size)
 	saveme.CommitBlock(fP.size);
 
 	pxAssert(size >= (size_t)buffer.GetLength());
-	printf("size : %i, buffer: %i\n", size , buffer.GetLength());
+//	printf("size : %i, buffer: %i\n", size , buffer.GetLength());
 	memcpy(data, buffer.GetPtr(), buffer.GetLength());
 
 

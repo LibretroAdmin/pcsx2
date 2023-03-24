@@ -169,7 +169,11 @@ static VirtualMemoryManagerPtr makeMemoryManager(const char* name, const char* f
 			// VTLB will throw a fit if we try to put EE main memory here
 			continue;
 		}
+#if defined(__LIBRETRO__) && defined(_DEBUG) && !defined(_WIN32)
 		auto mgr = std::make_shared<VirtualMemoryManager>(name, file_mapping_name, base, size, /*upper_bounds=*/0, /*strict=*/false);
+#else
+		auto mgr = std::make_shared<VirtualMemoryManager>(name, file_mapping_name, base, size, /*upper_bounds=*/0, /*strict=*/true);
+#endif
 		if (mgr->IsOk())
 		{
 			return mgr;

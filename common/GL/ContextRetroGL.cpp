@@ -65,7 +65,7 @@ namespace GL
 		if(g_gs_device->GetCurrent())
 			video_cb(RETRO_HW_FRAME_BUFFER_VALID, g_gs_device->GetCurrent()->GetWidth(), g_gs_device->GetCurrent()->GetHeight(), 0);
 		else
-			video_cb(NULL, 640, 480, 0);
+			video_cb(NULL, 0, 0, 0);
 		return true;
 	}
 

@@ -30,6 +30,11 @@
 
 #include "Config.h"
 
+#ifdef __LIBRETRO__
+#include "libretro_d3d.h"
+extern retro_environment_t environ_cb;
+#endif
+
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
@@ -90,7 +95,11 @@ void* D3D11HostDisplay::GetContext() const
 
 void* D3D11HostDisplay::GetSurface() const
 {
+#ifdef __LIBRETRO__
+	return nullptr;
+#else
 	return m_swap_chain.get();
+#endif
 }
 
 bool D3D11HostDisplay::HasDevice() const
@@ -100,7 +109,11 @@ bool D3D11HostDisplay::HasDevice() const
 
 bool D3D11HostDisplay::HasSurface() const
 {
+#ifdef __LIBRETRO__
+	return true;
+#else
 	return static_cast<bool>(m_swap_chain);
+#endif
 }
 
 std::unique_ptr<HostDisplayTexture> D3D11HostDisplay::CreateTexture(u32 width, u32 height, const void* data, u32 data_stride, bool dynamic /* = false */)
@@ -161,6 +174,7 @@ void D3D11HostDisplay::UpdateTexture(HostDisplayTexture* texture, u32 x, u32 y, 
 
 bool D3D11HostDisplay::GetHostRefreshRate(float* refresh_rate)
 {
+#ifndef __LIBRETRO__
 	if (m_swap_chain && IsFullscreen())
 	{
 		DXGI_SWAP_CHAIN_DESC desc;
@@ -174,6 +188,7 @@ bool D3D11HostDisplay::GetHostRefreshRate(float* refresh_rate)
 			return true;
 		}
 	}
+#endif
 
 	return HostDisplay::GetHostRefreshRate(refresh_rate);
 }
@@ -185,6 +200,21 @@ void D3D11HostDisplay::SetVSync(VsyncMode mode)
 
 bool D3D11HostDisplay::CreateDevice(const WindowInfo& wi, VsyncMode vsync)
 {
+#ifdef __LIBRETRO__
+	retro_hw_render_interface_d3d11 *d3d11 = nullptr;
+	if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void **)&d3d11) || !d3d11) {
+		printf("Failed to get HW rendering interface!\n");
+		return false;
+	}
+
+	if (d3d11->interface_version != RETRO_HW_RENDER_INTERFACE_D3D11_VERSION) {
+		printf("HW render interface mismatch, expected %u, got %u!\n", RETRO_HW_RENDER_INTERFACE_D3D11_VERSION, d3d11->interface_version);
+		return false;
+	}
+
+	m_device = d3d11->device;
+	m_context = d3d11->context;
+#else
 	UINT create_flags = 0;
 	if (EmuConfig.GS.UseDebugDevice)
 		create_flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -285,7 +315,7 @@ bool D3D11HostDisplay::CreateDevice(const WindowInfo& wi, VsyncMode vsync)
 		if (SUCCEEDED(hr))
 			m_allow_tearing_supported = (allow_tearing_supported == TRUE);
 	}
-
+#endif
 	m_window_info = wi;
 	m_vsync_mode = vsync;
 
@@ -312,6 +342,9 @@ bool D3D11HostDisplay::DoneCurrent()
 
 bool D3D11HostDisplay::CreateSwapChain(const DXGI_MODE_DESC* fullscreen_mode)
 {
+#ifdef __LIBRETRO__
+	return true;
+#else
 	if (m_window_info.type != WindowInfo::Type::Win32)
 		return false;
 
@@ -376,10 +409,12 @@ bool D3D11HostDisplay::CreateSwapChain(const DXGI_MODE_DESC* fullscreen_mode)
 	}
 
 	return CreateSwapChainRTV();
+#endif
 }
 
 bool D3D11HostDisplay::CreateSwapChainRTV()
 {
+#ifndef __LIBRETRO__
 	ComPtr<ID3D11Texture2D> backbuffer;
 	HRESULT hr = m_swap_chain->GetBuffer(0, IID_PPV_ARGS(backbuffer.put()));
 	if (FAILED(hr))
@@ -419,7 +454,7 @@ bool D3D11HostDisplay::CreateSwapChainRTV()
 			m_window_info.surface_refresh_rate = 0.0f;
 		}
 	}
-
+#endif
 	return true;
 }
 
@@ -435,9 +470,10 @@ void D3D11HostDisplay::DestroySurface()
 {
 	if (IsFullscreen())
 		SetFullscreen(false, 0, 0, 0.0f);
-
+#ifndef __LIBRETRO__
 	m_swap_chain_rtv.reset();
 	m_swap_chain.reset();
+#endif
 }
 
 std::string D3D11HostDisplay::GetDriverInfo() const
@@ -491,6 +527,7 @@ std::string D3D11HostDisplay::GetDriverInfo() const
 
 void D3D11HostDisplay::ResizeWindow(s32 new_window_width, s32 new_window_height, float new_window_scale)
 {
+#ifndef __LIBRETRO__
 	if (!m_swap_chain)
 		return;
 
@@ -508,6 +545,7 @@ void D3D11HostDisplay::ResizeWindow(s32 new_window_width, s32 new_window_height,
 
 	if (!CreateSwapChainRTV())
 		pxFailRel("Failed to recreate swap chain RTV after resize");
+#endif
 }
 
 bool D3D11HostDisplay::SupportsFullscreen() const
@@ -517,12 +555,17 @@ bool D3D11HostDisplay::SupportsFullscreen() const
 
 bool D3D11HostDisplay::IsFullscreen()
 {
+#ifdef __LIBRETRO__
+	return false;
+#else
 	BOOL is_fullscreen = FALSE;
 	return (m_swap_chain && SUCCEEDED(m_swap_chain->GetFullscreenState(&is_fullscreen, nullptr)) && is_fullscreen);
+#endif
 }
 
 bool D3D11HostDisplay::SetFullscreen(bool fullscreen, u32 width, u32 height, float refresh_rate)
 {
+#ifndef __LIBRETRO__
 	if (!m_swap_chain)
 		return false;
 
@@ -579,7 +622,7 @@ bool D3D11HostDisplay::SetFullscreen(bool fullscreen, u32 width, u32 height, flo
 
 		return false;
 	}
-
+#endif
 	return true;
 }
 
@@ -601,6 +644,7 @@ bool D3D11HostDisplay::UpdateImGuiFontTexture()
 
 HostDisplay::PresentResult D3D11HostDisplay::BeginPresent(bool frame_skip)
 {
+#ifndef __LIBRETRO__
 	if (frame_skip || !m_swap_chain)
 		return PresentResult::FrameSkipped;
 
@@ -619,11 +663,13 @@ HostDisplay::PresentResult D3D11HostDisplay::BeginPresent(bool frame_skip)
 	const CD3D11_RECT scissor(0, 0, m_window_info.surface_width, m_window_info.surface_height);
 	m_context->RSSetViewports(1, &vp);
 	m_context->RSSetScissorRects(1, &scissor);
+#endif
 	return PresentResult::OK;
 }
 
 void D3D11HostDisplay::EndPresent()
 {
+#ifndef __LIBRETRO__
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -639,6 +685,7 @@ void D3D11HostDisplay::EndPresent()
 
 	if (m_gpu_timing_enabled)
 		KickTimestampQuery();
+#endif
 }
 
 bool D3D11HostDisplay::CreateTimestampQueries()

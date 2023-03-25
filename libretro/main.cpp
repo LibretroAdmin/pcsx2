@@ -22,7 +22,9 @@
 #include "CDVD/CDVD.h"
 #include "MTVU.h"
 #include "Counters.h"
+#include "Host.h"
 #include "HostDisplay.h"
+#include "HostSettings.h"
 #include "common/StringUtil.h"
 #include "common/Path.h"
 #include "common/FileSystem.h"
@@ -38,8 +40,7 @@
 #include "pcsx2/Frontend/LayeredSettingsInterface.h"
 #include "pcsx2/VMManager.h"
 #include "pcsx2/StateWrapper.h"
-#include "HostDisplay.h"
-#include "HostSettings.h"
+#include "pcsx2/GS/Renderers/Common/GSRenderer.h"
 
 #include "SPU2/spu2.h"
 #include "PAD/Host/PAD.h"
@@ -154,7 +155,7 @@ void retro_set_environment(retro_environment_t cb)
 #endif
 }
 
-static std::vector<const char*> disk_images;
+static std::vector<std::string> disk_images;
 static int image_index = 0;
 
 static bool RETRO_CALLCONV get_eject_state(void)
@@ -177,7 +178,7 @@ static bool RETRO_CALLCONV set_eject_state(bool ejected)
 			VMManager::ChangeDisc(CDVD_SourceType::NoDisc, "");
 		else
 			VMManager::ChangeDisc(CDVD_SourceType::Iso, disk_images[image_index]);
-		cdvdCtrlTrayClose();
+//		cdvdCtrlTrayClose();
 	}
 
 	VMManager::SetPaused(false);
@@ -224,7 +225,7 @@ static bool RETRO_CALLCONV replace_image_index(unsigned index, const struct retr
 
 static bool RETRO_CALLCONV add_image_index(void)
 {
-	disk_images.push_back(nullptr);
+	disk_images.push_back("");
 	return true;
 }
 
@@ -243,10 +244,10 @@ static bool RETRO_CALLCONV get_image_path(unsigned index, char* path, size_t len
 	if (index >= disk_images.size())
 		return false;
 
-	if (!disk_images[index])
+	if (disk_images[index].empty())
 		return false;
 
-	strncpy(path, disk_images[index], len);
+	strncpy(path, disk_images[index].c_str(), len);
 	return true;
 }
 static bool RETRO_CALLCONV get_image_label(unsigned index, char* label, size_t len)
@@ -254,10 +255,10 @@ static bool RETRO_CALLCONV get_image_label(unsigned index, char* label, size_t l
 	if (index >= disk_images.size())
 		return false;
 
-	if (!disk_images[index])
+	if (disk_images[index].empty())
 		return false;
 
-	strncpy(label, disk_images[index], len);
+	strncpy(label, disk_images[index].c_str(), len);
 	return true;
 }
 
@@ -377,6 +378,8 @@ void retro_reset(void)
 	}
 }
 
+freezeData gs_freeze_data = {};
+
 static void context_reset()
 {
 	printf("Context reset\n");
@@ -417,6 +420,14 @@ static void context_reset()
 	GSConfig.UpscaleMultiplier = Options::upscale_multiplier;
 	EmuConfig.GS.UpscaleMultiplier = Options::upscale_multiplier;
 	GetMTGS().TryOpenGS();
+
+	if (gs_freeze_data.data)
+	{
+		g_gs_renderer->Defrost(&gs_freeze_data);
+		free(gs_freeze_data.data);
+		gs_freeze_data = {};
+	}
+
 	VMManager::SetPaused(false);
 }
 
@@ -424,8 +435,12 @@ static void context_destroy()
 {
 	cpu_thread_pause();
 
+	pxAssert(!gs_freeze_data.data);
+	g_gs_renderer->Freeze(&gs_freeze_data, true);
+	gs_freeze_data.data = (u8*)malloc(gs_freeze_data.size);
+	g_gs_renderer->Freeze(&gs_freeze_data, false);
+
 	GetMTGS().CloseGS();
-	g_host_display.reset();
 	printf("Context destroy\n");
 }
 
@@ -623,7 +638,9 @@ bool retro_load_game(const struct retro_game_info* game)
 	VMManager::ApplySettings();
 
 	VMBootParameters boot_params;
-	boot_params.filename = game->path;
+	if(game && game->path)
+		boot_params.filename = game->path;
+
 	cpu_thread = std::thread(cpu_thread_entry, boot_params);
 
 	return true;
@@ -643,6 +660,12 @@ void retro_unload_game(void)
 	InputManager::CloseSources();
 	VMManager::Internal::ReleaseMemory();
 	VMManager::Internal::ReleaseGlobals();
+
+	if (gs_freeze_data.data)
+	{
+		free(gs_freeze_data.data);
+		gs_freeze_data = {};
+	}
 
 	((LayeredSettingsInterface*)Host::GetSettingsInterface())->SetLayer(LayeredSettingsInterface::LAYER_BASE, nullptr);
 	new (&GetMTGS()) SysMtgsThread();
@@ -868,8 +891,6 @@ void SaveStateBase::InputRecordingFreeze()
 #endif
 }
 
-#include "Host.h"
-
 void Host::AddOSDMessage(std::string message, float duration)
 {
 
@@ -882,9 +903,6 @@ void Host::AddIconOSDMessage(std::string key, const char* icon, const std::strin
 {
 
 }
-
-#include "common/Path.h"
-#include "common/FileSystem.h"
 
 std::optional<std::vector<u8>> Host::ReadResourceFile(const char* filename)
 {
@@ -980,6 +998,7 @@ void Host::EndPresentFrame()
 
 void Host::ReleaseHostDisplay(bool clear_state)
 {
+	g_host_display.reset();
 }
 
 void Host::OnPerformanceMetricsUpdated()

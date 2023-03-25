@@ -570,7 +570,15 @@ void cpu_thread_entry(VMBootParameters boot_params)
 
 bool retro_load_game(const struct retro_game_info* game)
 {
+	const char* system_base = nullptr;
+	environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_base);
+	std::string system = Path::Combine(system_base, "pcsx2");
+
+	EmuFolders::AppRoot = system;
+	EmuFolders::Resources = Path::Combine(EmuFolders::AppRoot, "resources");
+	EmuFolders::DataRoot = EmuFolders::AppRoot;
 	CommonHost::InitializeCriticalFolders();
+
 	Host::Internal::SetBaseSettingsLayer(&s_settings_interface);
 	CommonHost::SetDefaultSettings(s_settings_interface, true, true, true, true, true);
 	CommonHost::LoadStartupSettings();
@@ -579,18 +587,6 @@ bool retro_load_game(const struct retro_game_info* game)
 		pxFailRel("Failed to allocate memory map");
 
 	VMManager::LoadSettings();
-
-	const char* system_base = nullptr;
-	environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_base);
-	std::string system = Path::Combine(system_base, "pcsx2");
-
-	EmuFolders::AppRoot = system;
-	EmuFolders::DataRoot = system;
-	EmuFolders::Bios = Path::Combine(system, "bios");
-	EmuFolders::Resources = Path::Combine(system, "resources");
-	EmuFolders::MemoryCards = Path::Combine(system, "memcards");
-	EmuFolders::GameSettings = Path::Combine(system, "gamesettings");
-
 
 	if (Options::bios.empty())
 	{
@@ -601,13 +597,7 @@ bool retro_load_game(const struct retro_game_info* game)
 	s_settings_interface.SetBoolValue("EmuCore/GS", "FrameLimitEnable", false);
 	s_settings_interface.SetFloatValue("EmuCore/GS", "upscale_multiplier", Options::upscale_multiplier);
 	s_settings_interface.SetBoolValue("EmuCore", "EnableFastBoot", Options::fast_boot);
-
-	EmuConfig.BaseFilenames.Bios = Options::bios.Get();
-	EmuConfig.CurrentIRX = ""; // By default no IRX injection
-//	EmuConfig.UseBOOT2Injection = Options::fast_boot;
-//	EmuConfig.GS.FrameLimitEnable = false;
-//	EmuConfig.GS.UpscaleMultiplier = Options::upscale_multiplier;
-//	EmuConfig.GS.SynchronousMTGS = true;
+	s_settings_interface.SetStringValue("Filenames", "BIOS", Options::bios.Get().c_str());
 
 	write_pos = 0;
 

@@ -105,6 +105,14 @@ SysMtgsThread& GetMTGS()
 	return s_mtgs_thread;
 }
 
+static void cpu_thread_pause()
+{
+	VMManager::SetPaused(true);
+	while(cpu_thread_state != VMState::Paused)
+		GetMTGS().Flush();
+	GetMTGS().Flush();
+}
+
 void retro_set_video_refresh(retro_video_refresh_t cb)
 {
 	video_cb = cb;
@@ -159,8 +167,7 @@ static bool RETRO_CALLCONV set_eject_state(bool ejected)
 	if (get_eject_state() == ejected)
 		return false;
 
-	GetMTGS().SignalVsync();
-	VMManager::SetPaused(true);
+	cpu_thread_pause();
 
 	if (ejected)
 		cdvdCtrlTrayOpen();
@@ -412,11 +419,11 @@ static void context_reset()
 	GetMTGS().TryOpenGS();
 	VMManager::SetPaused(false);
 }
+
 static void context_destroy()
 {
-	VMManager::SetPaused(true);
-	while(cpu_thread_state != VMState::Paused)
-		GetMTGS().Flush();
+	cpu_thread_pause();
+
 	GetMTGS().CloseGS();
 	g_host_display.reset();
 	printf("Context destroy\n");
@@ -529,6 +536,9 @@ static void executeVM()
 
 void cpu_thread_entry(VMBootParameters boot_params)
 {
+	Threading::SetNameOfCurrentThread("CPU Thread");
+//	PerformanceMetrics::SetCPUThread(Threading::ThreadHandle::GetForCallingThread());
+
 	VMManager::Initialize(boot_params);
 	VMManager::SetState(VMState::Running);
 
@@ -539,6 +549,8 @@ void cpu_thread_entry(VMBootParameters boot_params)
 
 		executeVM();
 	}
+
+//	PerformanceMetrics::SetCPUThread(Threading::ThreadHandle());
 }
 
 bool retro_load_game(const struct retro_game_info* game)
@@ -547,8 +559,11 @@ bool retro_load_game(const struct retro_game_info* game)
 	Host::Internal::SetBaseSettingsLayer(&s_settings_interface);
 	CommonHost::SetDefaultSettings(s_settings_interface, true, true, true, true, true);
 	CommonHost::LoadStartupSettings();
-	CommonHost::CPUThreadInitialize();
 
+	if (!VMManager::Internal::InitializeGlobals() || !VMManager::Internal::InitializeMemory())
+		pxFailRel("Failed to allocate memory map");
+
+	VMManager::LoadSettings();
 
 	const char* system_base = nullptr;
 	environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_base);
@@ -623,10 +638,15 @@ bool retro_load_game_special(unsigned game_type, const struct retro_game_info* i
 void retro_unload_game(void)
 {
 	VMManager::Shutdown(false);
-//	GetMTGS().CloseGS();
 	cpu_thread.join();
-	CommonHost::CPUThreadShutdown();
+
+	InputManager::CloseSources();
+	VMManager::Internal::ReleaseMemory();
+	VMManager::Internal::ReleaseGlobals();
+
 	((LayeredSettingsInterface*)Host::GetSettingsInterface())->SetLayer(LayeredSettingsInterface::LAYER_BASE, nullptr);
+	new (&GetMTGS()) SysMtgsThread();
+
 //	g_host_display.reset();
 }
 
@@ -708,9 +728,7 @@ size_t retro_serialize_size(void)
 
 bool retro_serialize(void* data, size_t size)
 {
-	VMManager::SetPaused(true);
-	while(cpu_thread_state != VMState::Paused)
-		GetMTGS().Flush();
+	cpu_thread_pause();
 
 	VmStateBuffer buffer;
 	memSavingState saveme(buffer);
@@ -764,9 +782,7 @@ bool retro_serialize(void* data, size_t size)
 
 bool retro_unserialize(const void* data, size_t size)
 {
-	VMManager::SetPaused(true);
-	while(cpu_thread_state != VMState::Paused)
-		GetMTGS().Flush();
+	cpu_thread_pause();
 
 	VmStateBuffer buffer;
 	buffer.MakeRoomFor(size);

@@ -193,9 +193,11 @@ void VMManager::SetState(VMState state)
 		const bool paused = (state == VMState::Paused);
 		if (paused)
 		{
+#ifndef __LIBRETRO__
 			if (THREAD_VU1)
 				vu1Thread.WaitVU();
 			GetMTGS().WaitGS(false);
+#endif
 		}
 		else
 		{

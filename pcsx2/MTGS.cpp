@@ -325,6 +325,14 @@ void SysMtgsThread::MainLoop()
 
 	while (true)
 	{
+#ifdef __LIBRETRO__
+		if (flush_all)
+		{
+			if(!m_sem_event.CheckForWork())
+				return;
+		}
+		else
+#endif
 		if (m_run_idle_flag.load(std::memory_order_acquire) && VMManager::GetState() != VMState::Running)
 		{
 			if (!m_sem_event.CheckForWork())
@@ -577,6 +585,13 @@ void SysMtgsThread::MainLoop()
 
 			m_ReadPos.store(newringpos, std::memory_order_release);
 
+#ifdef __LIBRETRO__
+			if(!flush_all && tag.command == GS_RINGTYPE_VSYNC) {
+				m_sem_event.NotifyOfWork();
+				return;
+			}
+#endif
+
 			if (m_SignalRingEnable.load(std::memory_order_acquire))
 			{
 				// The EEcore has requested a signal after some amount of processed data.
@@ -585,24 +600,9 @@ void SysMtgsThread::MainLoop()
 					// Make sure to post the signal after the m_ReadPos has been updated...
 					m_SignalRingEnable.store(false, std::memory_order_release);
 					m_sem_OnRingReset.Post();
-#ifndef __LIBRETRO__
 					continue;
-#endif
 				}
 			}
-#ifdef __LIBRETRO__
-			if(!flush_all && tag.command == GS_RINGTYPE_VSYNC) {
-				mtvu_lock.unlock();
-				return;
-			}
-			if(flush_all &&
-				!gifUnit.gifPath[GIF_PATH_1].getReadAmount() &&
-				!gifUnit.gifPath[GIF_PATH_2].getReadAmount() &&
-				!gifUnit.gifPath[GIF_PATH_3].getReadAmount()){
-				mtvu_lock.unlock();
-				return;
-			}
-#endif
 		}
 
 		// TODO: With the new race-free WorkSema do we still need these?
@@ -637,16 +637,7 @@ void SysMtgsThread::StepFrame()
 
 void SysMtgsThread::Flush()
 {
-	if (m_VsyncSignalListener.exchange(false))
-		m_sem_Vsync.Post();
-
 	pxAssert(std::this_thread::get_id() == m_thread);
-	if(!gifUnit.gifPath[GIF_PATH_1].getReadAmount() &&
-		!gifUnit.gifPath[GIF_PATH_2].getReadAmount() &&
-		!gifUnit.gifPath[GIF_PATH_3].getReadAmount())
-		return;
-
-	SetEvent();
 	MainLoop(true);
 }
 
@@ -981,9 +972,9 @@ bool SysMtgsThread::WaitForOpen()
 
 void SysMtgsThread::WaitForClose()
 {
+#ifndef __LIBRETRO__
 	if (!IsOpen())
 		return;
-#ifndef __LIBRETRO__
 	// ask the thread to stop processing work, by clearing the open flag
 	m_open_flag.store(false, std::memory_order_release);
 #endif

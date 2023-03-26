@@ -4,6 +4,8 @@
 #ifdef WIN32
 #include <windows.h>
 #undef Yield
+#undef min
+#undef max
 #endif
 
 

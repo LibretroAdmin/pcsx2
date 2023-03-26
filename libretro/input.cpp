@@ -67,6 +67,31 @@ static struct retro_input_descriptor desc[] = {
 
 namespace Input
 {
+static u32 button_mask[2];
+static int pad_lx[2];
+static int pad_ly[2];
+static int pad_rx[2];
+static int pad_ry[2];
+
+static int keymap[] =
+	{
+		RETRO_DEVICE_ID_JOYPAD_L2,     // PAD_L2
+		RETRO_DEVICE_ID_JOYPAD_R2,     // PAD_R2
+		RETRO_DEVICE_ID_JOYPAD_L,      // PAD_L1
+		RETRO_DEVICE_ID_JOYPAD_R,      // PAD_R1
+		RETRO_DEVICE_ID_JOYPAD_X,      // PAD_TRIANGLE
+		RETRO_DEVICE_ID_JOYPAD_A,      // PAD_CIRCLE
+		RETRO_DEVICE_ID_JOYPAD_B,      // PAD_CROSS
+		RETRO_DEVICE_ID_JOYPAD_Y,      // PAD_SQUARE
+		RETRO_DEVICE_ID_JOYPAD_SELECT, // PAD_SELECT
+		RETRO_DEVICE_ID_JOYPAD_L3,     // PAD_L3
+		RETRO_DEVICE_ID_JOYPAD_R3,     // PAD_R3
+		RETRO_DEVICE_ID_JOYPAD_START,  // PAD_START
+		RETRO_DEVICE_ID_JOYPAD_UP,     // PAD_UP
+		RETRO_DEVICE_ID_JOYPAD_RIGHT,  // PAD_RIGHT
+		RETRO_DEVICE_ID_JOYPAD_DOWN,   // PAD_DOWN
+		RETRO_DEVICE_ID_JOYPAD_LEFT,   // PAD_LEFT
+};
 
 void Init()
 {
@@ -83,6 +108,8 @@ void Init()
 
 	environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 	//	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
+	button_mask[0] = 0xFFFFFFFF;
+	button_mask[1] = 0xFFFFFFFF;
 }
 
 void Shutdown()
@@ -99,6 +126,25 @@ void Update()
 	input_cb(0, 0, 0, 0);
 #endif
 	Pad::rumble_all();
+
+	u32 mask = input_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+	button_mask[0] = 0xFFFF0000;
+	for (int i = 0; i < 16; i++)
+		button_mask[0] |= !(mask & (1 << keymap[i])) << i;
+
+	mask = input_cb(1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+	button_mask[1] = 0xFFFF0000;
+	for (int i = 0; i < 16; i++)
+		button_mask[1] |= !(mask & (1 << keymap[i])) << i;
+
+	pad_lx[0] = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+	pad_ly[0] = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+	pad_rx[0] = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+	pad_ry[0] = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+	pad_lx[1] = input_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+	pad_ly[1] = input_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+	pad_rx[1] = input_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+	pad_ry[1] = input_cb(1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
 }
 
 } // namespace Input
@@ -129,35 +175,9 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 //		rumble.set_rumble_state(pad, RETRO_RUMBLE_STRONG, 0xFFFF);
 //}
 
-static int keymap[] =
-	{
-		RETRO_DEVICE_ID_JOYPAD_L2,     // PAD_L2
-		RETRO_DEVICE_ID_JOYPAD_R2,     // PAD_R2
-		RETRO_DEVICE_ID_JOYPAD_L,      // PAD_L1
-		RETRO_DEVICE_ID_JOYPAD_R,      // PAD_R1
-		RETRO_DEVICE_ID_JOYPAD_X,      // PAD_TRIANGLE
-		RETRO_DEVICE_ID_JOYPAD_A,      // PAD_CIRCLE
-		RETRO_DEVICE_ID_JOYPAD_B,      // PAD_CROSS
-		RETRO_DEVICE_ID_JOYPAD_Y,      // PAD_SQUARE
-		RETRO_DEVICE_ID_JOYPAD_SELECT, // PAD_SELECT
-		RETRO_DEVICE_ID_JOYPAD_L3,     // PAD_L3
-		RETRO_DEVICE_ID_JOYPAD_R3,     // PAD_R3
-		RETRO_DEVICE_ID_JOYPAD_START,  // PAD_START
-		RETRO_DEVICE_ID_JOYPAD_UP,     // PAD_UP
-		RETRO_DEVICE_ID_JOYPAD_RIGHT,  // PAD_RIGHT
-		RETRO_DEVICE_ID_JOYPAD_DOWN,   // PAD_DOWN
-		RETRO_DEVICE_ID_JOYPAD_LEFT,   // PAD_LEFT
-};
-
-
 u32 PAD::KeyStatus::GetButtons(u32 pad)
 {
-	u32 mask = input_cb(pad, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-	u32 new_mask = 0xFFFF0000;
-	for (int i = 0; i < 16; i++)
-		new_mask |= !(mask & (1 << keymap[i])) << i;
-
-	return new_mask;
+	return Input::button_mask[pad];
 }
 
 u8 PAD::KeyStatus::GetPressure(u32 pad, u32 index)
@@ -167,27 +187,27 @@ u8 PAD::KeyStatus::GetPressure(u32 pad, u32 index)
 	{
 		case PAD_R_LEFT:
 		case PAD_R_RIGHT:
-			val = input_cb(pad, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+			val = Input::pad_lx[pad];
 			break;
 
 		case PAD_R_DOWN:
 		case PAD_R_UP:
-			val = input_cb(pad, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+			val = Input::pad_ly[pad];
 			break;
 
 		case PAD_L_LEFT:
 		case PAD_L_RIGHT:
-			val = input_cb(pad, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+			val = Input::pad_rx[pad];
 			break;
 
 		case PAD_L_DOWN:
 		case PAD_L_UP:
-			val = input_cb(pad, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+			val = Input::pad_ry[pad];
 			break;
 
 		default:
 			if (index < 16)
-				val = input_cb(pad, RETRO_DEVICE_JOYPAD, 0, keymap[index]);
+				val = !(Input::button_mask[pad] & (1 << Input::keymap[index]));
 			break;
 	}
 

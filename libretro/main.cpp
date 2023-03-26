@@ -586,7 +586,10 @@ bool retro_load_game(const struct retro_game_info* game)
 	CommonHost::LoadStartupSettings();
 
 	if (!VMManager::Internal::InitializeGlobals() || !VMManager::Internal::InitializeMemory())
-		pxFailRel("Failed to allocate memory map");
+	{
+		log_cb(RETRO_LOG_ERROR, "Failed to allocate memory map");
+		return false;
+	}
 
 	VMManager::LoadSettings();
 

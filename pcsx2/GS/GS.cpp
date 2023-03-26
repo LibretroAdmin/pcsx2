@@ -82,7 +82,7 @@ int GSinit()
 
 	GSUtil::Init();
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 	s_hr = ::CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #endif
 
@@ -93,7 +93,7 @@ void GSshutdown()
 {
 	GSclose();
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 	if (SUCCEEDED(s_hr))
 	{
 		::CoUninitialize();

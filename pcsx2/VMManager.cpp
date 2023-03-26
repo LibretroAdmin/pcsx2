@@ -295,7 +295,7 @@ void VMManager::Internal::ReleaseGlobals()
 	SPU2::Shutdown();
 	GSshutdown();
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__LIBRETRO__)
 	CoUninitialize();
 #endif
 }

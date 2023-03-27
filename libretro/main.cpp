@@ -632,9 +632,13 @@ bool retro_load_game(const struct retro_game_info* game)
 
 	VMManager::ApplySettings();
 
+	image_index = 0;
 	VMBootParameters boot_params;
 	if(game && game->path)
+	{
+		disk_images.push_back(game->path);
 		boot_params.filename = game->path;
+	}
 
 	cpu_thread = std::thread(cpu_thread_entry, boot_params);
 

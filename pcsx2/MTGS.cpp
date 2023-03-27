@@ -51,6 +51,9 @@ using namespace Threading;
 
 alignas(32) MTGS_BufferedData RingBuffer;
 
+#ifdef __LIBRETRO__
+void MTGSCallback();
+#endif
 
 #ifdef RINGBUF_DEBUG_STACK
 #include <list>
@@ -586,6 +589,7 @@ void SysMtgsThread::MainLoop()
 			m_ReadPos.store(newringpos, std::memory_order_release);
 
 #ifdef __LIBRETRO__
+			MTGSCallback();
 			if(!flush_all && tag.command == GS_RINGTYPE_VSYNC) {
 				m_sem_event.NotifyOfWork();
 				return;

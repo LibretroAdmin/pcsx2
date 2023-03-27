@@ -705,23 +705,19 @@ void retro_run(void)
 	RETRO_PERFORMANCE_INIT(pcsx2_run);
 	RETRO_PERFORMANCE_START(pcsx2_run);
 
-	if (write_pos > (0x100 << 1))
-	{
-		std::unique_lock locker(snd_mutex);
-		batch_cb(snd_buffer, write_pos >> 1);
-		write_pos = 0;
-	}
-
 	GetMTGS().StepFrame();
 
+	RETRO_PERFORMANCE_STOP(pcsx2_run);
+}
+
+void MTGSCallback()
+{
 	if (write_pos > (0x100 << 1))
 	{
 		std::unique_lock locker(snd_mutex);
 		batch_cb(snd_buffer, write_pos >> 1);
 		write_pos = 0;
 	}
-
-	RETRO_PERFORMANCE_STOP(pcsx2_run);
 }
 
 size_t retro_serialize_size(void)
@@ -981,12 +977,6 @@ bool Host::AcquireHostDisplay(RenderAPI api, bool clear_state_on_fail)
 
 HostDisplay::PresentResult Host::BeginPresentFrame(bool frame_skip)
 {
-	if (write_pos > (0x100 << 1))
-	{
-		std::unique_lock locker(snd_mutex);
-		batch_cb(snd_buffer, write_pos >> 1);
-		write_pos = 0;
-	}
 	return g_host_display->BeginPresent(frame_skip);
 }
 

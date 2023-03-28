@@ -1089,6 +1089,10 @@ if(LIBRETRO)
 		Frontend/CommonHotkeys.cpp
 		Frontend/InputManager.cpp
 	)
+	LIST(REMOVE_ITEM pcsx2FrontendSources
+		Frontend/DinputSource.cpp
+		Frontend/XInputSource.cpp
+	)
 	LIST(REMOVE_ITEM pcsx2SPU2Sources
 	#	SPU2/Debug.cpp
 	#	SPU2/Wavedump_wav.cpp

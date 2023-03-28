@@ -218,7 +218,7 @@ if(APPLE)
 	target_link_options(common PRIVATE -fobjc-link-runtime)
 endif()
 
-if(USE_OPENGL)
+if(USE_OPENGL AND NOT LIBRETRO)
 	if(WIN32)
 		target_sources(common PRIVATE
 			GL/ContextWGL.cpp

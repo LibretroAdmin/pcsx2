@@ -2,6 +2,7 @@ add_library(glad
 	src/glad.c
 )
 
+if(NOT LIBRETRO)
 if(WIN32)
 	target_sources(glad PRIVATE
 		src/glad_wgl.c
@@ -10,6 +11,7 @@ elseif(X11_API OR WAYLAND_API)
 	target_sources(glad PRIVATE
 		src/glad_egl.c
 	)
+endif()
 endif()
 
 target_include_directories(glad PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")

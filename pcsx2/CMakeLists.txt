@@ -1090,7 +1090,7 @@ if(LIBRETRO)
 		Frontend/InputManager.cpp
 	)
 	LIST(REMOVE_ITEM pcsx2FrontendSources
-		Frontend/DinputSource.cpp
+		Frontend/DInputSource.cpp
 		Frontend/XInputSource.cpp
 	)
 	LIST(REMOVE_ITEM pcsx2SPU2Sources

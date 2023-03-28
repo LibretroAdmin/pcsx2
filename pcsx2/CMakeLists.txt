@@ -1096,6 +1096,7 @@ if(LIBRETRO)
 		SPU2/SndOut.cpp
 		SPU2/SndOut_SDL.cpp
 		SPU2/SndOut_Portaudio.cpp
+		SPU2/SndOut_XAudio2.cpp
 		SPU2/Config.cpp
 		SPU2/ConfigSoundTouch.cpp
 		SPU2/Timestretcher.cpp
